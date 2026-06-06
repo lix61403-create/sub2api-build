@@ -166,6 +166,13 @@ type CheckMixedChannelRequest struct {
 	AccountID *int64  `json:"account_id"`
 }
 
+type SyncUpstreamModelsPreviewRequest struct {
+	Platform string `json:"platform" binding:"required"`
+	Type     string `json:"type" binding:"required,oneof=apikey"`
+	BaseURL  string `json:"base_url"`
+	APIKey   string `json:"api_key" binding:"required"`
+}
+
 // AccountWithConcurrency extends Account with real-time concurrency info
 type AccountWithConcurrency struct {
 	*dto.Account
@@ -2124,6 +2131,54 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 		}
 
 		slog.Warn("sync_upstream_models_failed", "account_id", accountID)
+		response.Error(c, http.StatusBadGateway, "Failed to sync upstream models from upstream")
+		return
+	}
+
+	response.Success(c, gin.H{"models": models})
+}
+
+// SyncUpstreamModelsPreview handles syncing live supported models before an account is saved.
+// POST /api/v1/admin/accounts/models/sync-upstream/preview
+func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
+	var req SyncUpstreamModelsPreviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if h.accountTestService == nil {
+		response.InternalError(c, "Account test service is not configured")
+		return
+	}
+
+	account := &service.Account{
+		Platform: strings.TrimSpace(req.Platform),
+		Type:     req.Type,
+		Credentials: map[string]any{
+			"api_key": strings.TrimSpace(req.APIKey),
+		},
+		Concurrency: 1,
+	}
+	if baseURL := strings.TrimSpace(req.BaseURL); baseURL != "" {
+		account.Credentials["base_url"] = baseURL
+	}
+
+	models, err := h.accountTestService.FetchUpstreamSupportedModels(c.Request.Context(), account)
+	if err != nil {
+		var syncErr *service.UpstreamModelSyncError
+		if errors.As(err, &syncErr) {
+			switch syncErr.Kind {
+			case service.UpstreamModelSyncErrorConfiguration, service.UpstreamModelSyncErrorUnsupported:
+				response.BadRequest(c, syncErr.SafeMessage())
+			default:
+				slog.Warn("sync_upstream_models_preview_failed", "platform", account.Platform, "kind", syncErr.Kind)
+				response.Error(c, http.StatusBadGateway, syncErr.SafeMessage())
+			}
+			return
+		}
+
+		slog.Warn("sync_upstream_models_preview_failed", "platform", account.Platform)
 		response.Error(c, http.StatusBadGateway, "Failed to sync upstream models from upstream")
 		return
 	}
