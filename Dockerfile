@@ -25,6 +25,7 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Install dependencies first (better caching)
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN node -e "const fs=require('fs');const p='package.json';let s=fs.readFileSync(p,'utf8');if(s.charCodeAt(0)===0xfeff)s=s.slice(1);JSON.parse(s);fs.writeFileSync(p,s);"
 RUN pnpm install --frozen-lockfile
 
 # Copy frontend source and build
