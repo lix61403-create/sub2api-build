@@ -33,6 +33,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Confirm Dockerfile patch
+        run: |
+          grep -n "JSON.parse" Dockerfile
+          git rev-parse HEAD
+
       - name: Build image
         uses: docker/build-push-action@v6
         with:
@@ -40,6 +45,7 @@ jobs:
           file: ./Dockerfile
           push: false
           load: true
+          no-cache: true
           tags: sub2api:github-${{ github.run_number }}
           build-args: |
             GOPROXY=https://goproxy.cn,direct
