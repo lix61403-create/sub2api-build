@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Admin Accounts API endpoints
  * Handles AI platform account management for administrators
  */
@@ -477,13 +477,6 @@ export interface SyncUpstreamModelsResult {
   models: string[]
 }
 
-export interface SyncUpstreamPreviewParams {
-  platform: string
-  type: string
-  base_url?: string
-  api_key: string
-}
-
 /**
  * Sync live supported models from the account's upstream model-list endpoint
  * @param id - Account ID
@@ -494,11 +487,20 @@ export async function syncUpstreamModels(id: number): Promise<SyncUpstreamModels
   return data
 }
 
+export interface SyncUpstreamPreviewParams {
+  platform: string
+  type: string
+  base_url?: string
+  api_key: string
+}
+
 /**
- * Sync live supported models using unsaved account credentials from the create form.
+ * Preview upstream models without a saved account (create-flow)
+ * @param params - Connection credentials
+ * @returns List of model IDs returned by the upstream
  */
 export async function syncUpstreamModelsPreview(params: SyncUpstreamPreviewParams): Promise<SyncUpstreamModelsResult> {
-  const { data } = await apiClient.post<SyncUpstreamModelsResult>('/admin/accounts/models/sync-upstream/preview', params)
+  const { data } = await apiClient.post<SyncUpstreamModelsResult>('/admin/accounts/models/sync-upstream-preview', params)
   return data
 }
 
@@ -737,4 +739,3 @@ export const accountsAPI = {
 }
 
 export default accountsAPI
-

@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - master
+      - codex/sub2api-v0.1.134-pushable
     paths:
       - Dockerfile
       - backend/**
@@ -33,11 +34,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Confirm Dockerfile patch
-        run: |
-          grep -n "JSON.parse" Dockerfile
-          git rev-parse HEAD
-
       - name: Build image
         uses: docker/build-push-action@v6
         with:
@@ -50,6 +46,7 @@ jobs:
           build-args: |
             GOPROXY=https://goproxy.cn,direct
             GOSUMDB=sum.golang.google.cn
+            COMMIT=${{ github.sha }}
 
       - name: Save image archive
         run: |

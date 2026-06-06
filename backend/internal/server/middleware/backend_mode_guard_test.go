@@ -354,18 +354,6 @@ func TestBackendModeAuthGuard(t *testing.T) {
 			path:       "/api/v1/auth/forgot-password",
 			wantStatus: http.StatusForbidden,
 		},
-		{
-			name:       "enabled_blocks_send_password_reset_code",
-			enabled:    "true",
-			path:       "/api/v1/auth/send-password-reset-code",
-			wantStatus: http.StatusForbidden,
-		},
-		{
-			name:       "enabled_blocks_reset_password_with_code",
-			enabled:    "true",
-			path:       "/api/v1/auth/reset-password-with-code",
-			wantStatus: http.StatusForbidden,
-		},
 	}
 
 	for _, tc := range tests {

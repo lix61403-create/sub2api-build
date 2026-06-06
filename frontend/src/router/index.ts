@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Vue Router configuration for Sub2API frontend
  * Defines all application routes with lazy loading and navigation guards
  */
@@ -279,13 +279,14 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/purchase',
     name: 'PurchaseSubscription',
-    component: () => import('@/views/user/ExternalShopView.vue'),
+    component: () => import('@/views/user/PaymentView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Purchase Subscription',
       titleKey: 'nav.buySubscription',
-      descriptionKey: 'purchase.description'
+      descriptionKey: 'purchase.description',
+      requiresPayment: true
     }
   },
   {
@@ -905,4 +906,3 @@ router.onError((error) => {
 })
 
 export default router
-

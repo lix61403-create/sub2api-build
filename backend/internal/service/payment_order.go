@@ -452,12 +452,7 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 		}
 		return nil, classifyCreatePaymentError(req, sel.ProviderKey, err)
 	}
-	if providerPayAmount := validProviderPayAmount(pr.PayAmount); providerPayAmount > 0 {
-		payAmount = providerPayAmount
-		order.PayAmount = providerPayAmount
-	}
 	_, err = s.entClient.PaymentOrder.UpdateOneID(order.ID).
-		SetPayAmount(order.PayAmount).
 		SetNillablePaymentTradeNo(psNilIfEmpty(pr.TradeNo)).
 		SetNillablePayURL(psNilIfEmpty(pr.PayURL)).
 		SetNillableQrCode(psNilIfEmpty(pr.QRCode)).
@@ -496,13 +491,6 @@ func buildProviderCreatePaymentRequest(req CreateOrderRequest, sel *payment.Inst
 		IsMobile:           req.IsMobile,
 		InstanceSubMethods: selectedInstanceSupportedTypes(sel),
 	}
-}
-
-func validProviderPayAmount(amount float64) float64 {
-	if amount <= 0 || math.IsNaN(amount) || math.IsInf(amount, 0) {
-		return 0
-	}
-	return amount
 }
 
 func selectedInstanceSupportedTypes(sel *payment.InstanceSelection) string {
@@ -689,14 +677,10 @@ func classifyCreatePaymentError(req CreateOrderRequest, providerKey string, err 
 }
 
 func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest, payAmount float64, sel *payment.InstanceSelection, pr *payment.CreatePaymentResponse, resultType payment.CreatePaymentResultType) *CreateOrderResponse {
-	actualPayAmount := order.PayAmount
-	if actualPayAmount <= 0 {
-		actualPayAmount = payAmount
-	}
 	return &CreateOrderResponse{
 		OrderID:      order.ID,
 		Amount:       order.Amount,
-		PayAmount:    actualPayAmount,
+		PayAmount:    payAmount,
 		FeeRate:      order.FeeRate,
 		Status:       OrderStatusPending,
 		ResultType:   resultType,

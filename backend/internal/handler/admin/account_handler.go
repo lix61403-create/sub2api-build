@@ -1,4 +1,4 @@
-﻿// Package admin provides HTTP handlers for administrative operations.
+// Package admin provides HTTP handlers for administrative operations.
 package admin
 
 import (
@@ -164,13 +164,6 @@ type CheckMixedChannelRequest struct {
 	Platform  string  `json:"platform" binding:"required"`
 	GroupIDs  []int64 `json:"group_ids"`
 	AccountID *int64  `json:"account_id"`
-}
-
-type SyncUpstreamModelsPreviewRequest struct {
-	Platform string `json:"platform" binding:"required"`
-	Type     string `json:"type" binding:"required,oneof=apikey"`
-	BaseURL  string `json:"base_url"`
-	APIKey   string `json:"api_key" binding:"required"`
 }
 
 // AccountWithConcurrency extends Account with real-time concurrency info
@@ -2138,13 +2131,27 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 	response.Success(c, gin.H{"models": models})
 }
 
-// SyncUpstreamModelsPreview handles syncing live supported models before an account is saved.
-// POST /api/v1/admin/accounts/models/sync-upstream/preview
+// SyncUpstreamModelsPreview handles syncing live supported models using provided credentials (no account ID needed).
+// POST /api/v1/admin/accounts/models/sync-upstream-preview
 func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
-	var req SyncUpstreamModelsPreviewRequest
+	var req struct {
+		Platform string `json:"platform" binding:"required"`
+		Type     string `json:"type" binding:"required"`
+		BaseURL  string `json:"base_url"`
+		APIKey   string `json:"api_key" binding:"required"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
+	}
+
+	tempAccount := &service.Account{
+		Platform: req.Platform,
+		Type:     req.Type,
+		Credentials: map[string]any{
+			"api_key":  req.APIKey,
+			"base_url": req.BaseURL,
+		},
 	}
 
 	if h.accountTestService == nil {
@@ -2152,19 +2159,7 @@ func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
 		return
 	}
 
-	account := &service.Account{
-		Platform: strings.TrimSpace(req.Platform),
-		Type:     req.Type,
-		Credentials: map[string]any{
-			"api_key": strings.TrimSpace(req.APIKey),
-		},
-		Concurrency: 1,
-	}
-	if baseURL := strings.TrimSpace(req.BaseURL); baseURL != "" {
-		account.Credentials["base_url"] = baseURL
-	}
-
-	models, err := h.accountTestService.FetchUpstreamSupportedModels(c.Request.Context(), account)
+	models, err := h.accountTestService.FetchUpstreamSupportedModels(c.Request.Context(), tempAccount)
 	if err != nil {
 		var syncErr *service.UpstreamModelSyncError
 		if errors.As(err, &syncErr) {
@@ -2172,13 +2167,13 @@ func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
 			case service.UpstreamModelSyncErrorConfiguration, service.UpstreamModelSyncErrorUnsupported:
 				response.BadRequest(c, syncErr.SafeMessage())
 			default:
-				slog.Warn("sync_upstream_models_preview_failed", "platform", account.Platform, "kind", syncErr.Kind)
+				slog.Warn("sync_upstream_models_preview_failed", "platform", req.Platform, "kind", syncErr.Kind)
 				response.Error(c, http.StatusBadGateway, syncErr.SafeMessage())
 			}
 			return
 		}
 
-		slog.Warn("sync_upstream_models_preview_failed", "platform", account.Platform)
+		slog.Warn("sync_upstream_models_preview_failed", "platform", req.Platform)
 		response.Error(c, http.StatusBadGateway, "Failed to sync upstream models from upstream")
 		return
 	}
@@ -2416,4 +2411,3 @@ func sanitizeExtraBaseRPM(extra map[string]any) {
 	}
 	extra["base_rpm"] = v
 }
-

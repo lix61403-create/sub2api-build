@@ -522,35 +522,12 @@ export interface ForgotPasswordResponse {
 }
 
 /**
- * Request password reset link (legacy compatibility flow)
+ * Request password reset link
  * @param request - Email and optional Turnstile token
  * @returns Response with message
  */
 export async function forgotPassword(request: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
   const { data } = await apiClient.post<ForgotPasswordResponse>('/auth/forgot-password', request)
-  return data
-}
-
-/**
- * Send password reset code request
- */
-export interface SendPasswordResetCodeRequest {
-  email: string
-  turnstile_token?: string
-}
-
-/**
- * Send password reset code response
- */
-export interface SendPasswordResetCodeResponse {
-  message: string
-  countdown: number
-}
-
-export async function sendPasswordResetCode(
-  request: SendPasswordResetCodeRequest
-): Promise<SendPasswordResetCodeResponse> {
-  const { data } = await apiClient.post<SendPasswordResetCodeResponse>('/auth/send-password-reset-code', request)
   return data
 }
 
@@ -577,22 +554,6 @@ export interface ResetPasswordResponse {
  */
 export async function resetPassword(request: ResetPasswordRequest): Promise<ResetPasswordResponse> {
   const { data } = await apiClient.post<ResetPasswordResponse>('/auth/reset-password', request)
-  return data
-}
-
-/**
- * Reset password with email verification code request
- */
-export interface ResetPasswordWithCodeRequest {
-  email: string
-  verify_code: string
-  new_password: string
-}
-
-export async function resetPasswordWithCode(
-  request: ResetPasswordWithCodeRequest
-): Promise<ResetPasswordResponse> {
-  const { data } = await apiClient.post<ResetPasswordResponse>('/auth/reset-password-with-code', request)
   return data
 }
 
@@ -717,9 +678,7 @@ export const authAPI = {
   validatePromoCode,
   validateInvitationCode,
   forgotPassword,
-  sendPasswordResetCode,
   resetPassword,
-  resetPasswordWithCode,
   refreshToken,
   revokeAllSessions,
   getPendingOAuthBindLoginKind,

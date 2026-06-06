@@ -4,9 +4,10 @@
       @click="toggleDropdown"
       :disabled="switching"
       class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-      :title="localeDisplayName(currentLocaleCode)"
+      :title="currentLocale?.name"
     >
-      <span>{{ currentLocaleLabel }}</span>
+      <span class="text-base">{{ currentLocale?.flag }}</span>
+      <span class="hidden sm:inline">{{ currentLocale?.code.toUpperCase() }}</span>
       <Icon
         name="chevronDown"
         size="xs"
@@ -31,10 +32,8 @@
               locale.code === currentLocaleCode
           }"
         >
-          <span class="flex h-5 min-w-8 items-center justify-center rounded bg-gray-100 px-1 text-xs font-semibold uppercase text-gray-500 dark:bg-dark-700 dark:text-gray-300">
-            {{ locale.code.toUpperCase() }}
-          </span>
-          <span>{{ localeDisplayName(locale.code) }}</span>
+          <span class="text-base">{{ locale.flag }}</span>
+          <span>{{ locale.name }}</span>
           <Icon v-if="locale.code === currentLocaleCode" name="check" size="sm" class="ml-auto text-primary-500" />
         </button>
       </div>
@@ -55,11 +54,7 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const switching = ref(false)
 
 const currentLocaleCode = computed(() => locale.value)
-const currentLocaleLabel = computed(() => currentLocaleCode.value.toUpperCase())
-
-function localeDisplayName(code: string) {
-  return code === 'zh' ? 'Chinese' : 'English'
-}
+const currentLocale = computed(() => availableLocales.find((l) => l.code === locale.value))
 
 function toggleDropdown() {
   isOpen.value = !isOpen.value

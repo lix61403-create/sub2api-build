@@ -22,14 +22,13 @@ type rateLimitClearRepoStub struct {
 	clearAntigravityCalls     int
 	clearModelRateLimitCalls  int
 	clearTempUnschedCalls     int
+	setSchedulableCalls       int
+	setSchedulableValue       bool
 	clearErrorErr             error
 	clearRateLimitErr         error
 	clearAntigravityErr       error
 	clearModelRateLimitErr    error
 	clearTempUnschedulableErr error
-	setSchedulableCalls       int
-	setSchedulableValue       bool
-	setSchedulableErr         error
 }
 
 func (r *rateLimitClearRepoStub) GetByID(ctx context.Context, id int64) (*Account, error) {
@@ -68,7 +67,7 @@ func (r *rateLimitClearRepoStub) ClearTempUnschedulable(ctx context.Context, id 
 func (r *rateLimitClearRepoStub) SetSchedulable(ctx context.Context, id int64, schedulable bool) error {
 	r.setSchedulableCalls++
 	r.setSchedulableValue = schedulable
-	return r.setSchedulableErr
+	return nil
 }
 
 type tempUnschedCacheRecorder struct {
@@ -273,7 +272,6 @@ func TestRateLimitService_RecoverAccountAfterSuccessfulTest_NoRecoverableStateIs
 
 	require.Equal(t, 1, repo.getByIDCalls)
 	require.Equal(t, 0, repo.clearErrorCalls)
-	require.Equal(t, 0, repo.setSchedulableCalls)
 	require.Equal(t, 0, repo.clearRateLimitCalls)
 	require.Equal(t, 0, repo.clearAntigravityCalls)
 	require.Equal(t, 0, repo.clearModelRateLimitCalls)
@@ -284,9 +282,8 @@ func TestRateLimitService_RecoverAccountAfterSuccessfulTest_NoRecoverableStateIs
 func TestRateLimitService_RecoverAccountAfterSuccessfulTest_ClearErrorFailed(t *testing.T) {
 	repo := &rateLimitClearRepoStub{
 		getByIDAccount: &Account{
-			ID:          9,
-			Status:      StatusError,
-			Schedulable: false,
+			ID:     9,
+			Status: StatusError,
 		},
 		clearErrorErr: errors.New("clear error failed"),
 	}
@@ -297,29 +294,6 @@ func TestRateLimitService_RecoverAccountAfterSuccessfulTest_ClearErrorFailed(t *
 	require.Nil(t, result)
 	require.Equal(t, 1, repo.getByIDCalls)
 	require.Equal(t, 1, repo.clearErrorCalls)
-	require.Equal(t, 1, repo.setSchedulableCalls)
-	require.True(t, repo.setSchedulableValue)
-	require.Equal(t, 0, repo.clearRateLimitCalls)
-}
-
-func TestRateLimitService_RecoverAccountAfterSuccessfulTest_SetSchedulableFailed(t *testing.T) {
-	repo := &rateLimitClearRepoStub{
-		getByIDAccount: &Account{
-			ID:          10,
-			Status:      StatusError,
-			Schedulable: false,
-		},
-		setSchedulableErr: errors.New("set schedulable failed"),
-	}
-	svc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
-
-	result, err := svc.RecoverAccountAfterSuccessfulTest(context.Background(), 10)
-	require.Error(t, err)
-	require.Nil(t, result)
-	require.Equal(t, 1, repo.getByIDCalls)
-	require.Equal(t, 0, repo.clearErrorCalls)
-	require.Equal(t, 1, repo.setSchedulableCalls)
-	require.True(t, repo.setSchedulableValue)
 	require.Equal(t, 0, repo.clearRateLimitCalls)
 }
 
@@ -342,9 +316,7 @@ func TestRateLimitService_RecoverAccountState_InvalidatesOAuthTokenOnErrorRecove
 	require.NotNil(t, result)
 	require.True(t, result.ClearedError)
 	require.False(t, result.ClearedRateLimit)
-	require.False(t, result.RestoredSchedulable)
 	require.Equal(t, 1, repo.clearErrorCalls)
-	require.Equal(t, 0, repo.setSchedulableCalls)
 	require.Len(t, invalidator.accounts, 1)
 	require.Equal(t, int64(21), invalidator.accounts[0].ID)
 }

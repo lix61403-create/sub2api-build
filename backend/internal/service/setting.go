@@ -1,4 +1,4 @@
-﻿package service
+package service
 
 import "time"
 
@@ -8,4 +8,3 @@ type Setting struct {
 	Value     string
 	UpdatedAt time.Time
 }
-

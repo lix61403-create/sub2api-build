@@ -58,16 +58,10 @@ func RegisterAuthRoutes(
 		auth.POST("/forgot-password", rateLimiter.LimitWithOptions("forgot-password", 5, time.Minute, middleware.RateLimitOptions{
 			FailureMode: middleware.RateLimitFailClose,
 		}), h.Auth.ForgotPassword)
-		auth.POST("/send-password-reset-code", rateLimiter.LimitWithOptions("send-password-reset-code", 5, time.Minute, middleware.RateLimitOptions{
-			FailureMode: middleware.RateLimitFailClose,
-		}), h.Auth.SendPasswordResetCode)
 		// 重置密码接口添加速率限制：每分钟最多 10 次（Redis 故障时 fail-close）
 		auth.POST("/reset-password", rateLimiter.LimitWithOptions("reset-password", 10, time.Minute, middleware.RateLimitOptions{
 			FailureMode: middleware.RateLimitFailClose,
 		}), h.Auth.ResetPassword)
-		auth.POST("/reset-password-with-code", rateLimiter.LimitWithOptions("reset-password-with-code", 10, time.Minute, middleware.RateLimitOptions{
-			FailureMode: middleware.RateLimitFailClose,
-		}), h.Auth.ResetPasswordWithCode)
 		auth.GET("/oauth/linuxdo/start", h.Auth.LinuxDoOAuthStart)
 		auth.GET("/oauth/github/start", h.Auth.GitHubOAuthStart)
 		auth.GET("/oauth/github/callback", h.Auth.GitHubOAuthCallback)

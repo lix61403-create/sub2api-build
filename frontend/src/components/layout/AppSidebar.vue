@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <aside
     class="sidebar"
     :class="[
@@ -1020,4 +1020,3 @@ onMounted(() => {
   height: 1.25rem;
 }
 </style>
-

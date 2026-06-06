@@ -1248,16 +1248,10 @@ func (s *AuthService) IsPasswordResetEnabled(ctx context.Context) bool {
 	return s.settingService.IsPasswordResetEnabled(ctx)
 }
 
-func normalizePasswordResetEmail(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
-}
-
 // preparePasswordReset validates the password reset request and returns necessary data
 // Returns (siteName, resetURL, shouldProceed)
 // shouldProceed is false when we should silently return success (to prevent enumeration)
 func (s *AuthService) preparePasswordReset(ctx context.Context, email, frontendBaseURL string) (string, string, bool) {
-	email = normalizePasswordResetEmail(email)
-
 	// Check if user exists (but don't reveal this to the caller)
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
@@ -1288,37 +1282,9 @@ func (s *AuthService) preparePasswordReset(ctx context.Context, email, frontendB
 	return siteName, resetURL, true
 }
 
-func (s *AuthService) preparePasswordResetCode(ctx context.Context, email string) (string, string, bool) {
-	email = normalizePasswordResetEmail(email)
-
-	user, err := s.userRepo.GetByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
-			logger.LegacyPrintf("service.auth", "[Auth] Password reset code requested for non-existent email: %s", email)
-			return "", "", false
-		}
-		logger.LegacyPrintf("service.auth", "[Auth] Database error checking email for password reset code: %v", err)
-		return "", "", false
-	}
-
-	if !user.IsActive() {
-		logger.LegacyPrintf("service.auth", "[Auth] Password reset code requested for inactive user: %s", email)
-		return "", "", false
-	}
-
-	siteName := "Sub2API"
-	if s.settingService != nil {
-		siteName = s.settingService.GetSiteName(ctx)
-	}
-
-	return email, siteName, true
-}
-
 // RequestPasswordReset 请求密码重置（同步发送）
 // Security: Returns the same response regardless of whether the email exists (prevent user enumeration)
 func (s *AuthService) RequestPasswordReset(ctx context.Context, email, frontendBaseURL string, locale ...string) error {
-	email = normalizePasswordResetEmail(email)
-
 	if !s.IsPasswordResetEnabled(ctx) {
 		return infraerrors.Forbidden("PASSWORD_RESET_DISABLED", "password reset is not enabled")
 	}
@@ -1343,8 +1309,6 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email, frontendB
 // RequestPasswordResetAsync 异步请求密码重置（队列发送）
 // Security: Returns the same response regardless of whether the email exists (prevent user enumeration)
 func (s *AuthService) RequestPasswordResetAsync(ctx context.Context, email, frontendBaseURL string, locale ...string) error {
-	email = normalizePasswordResetEmail(email)
-
 	if !s.IsPasswordResetEnabled(ctx) {
 		return infraerrors.Forbidden("PASSWORD_RESET_DISABLED", "password reset is not enabled")
 	}
@@ -1366,38 +1330,9 @@ func (s *AuthService) RequestPasswordResetAsync(ctx context.Context, email, fron
 	return nil
 }
 
-// SendPasswordResetCode sends a verification code for password reset.
-// Security: Returns the same response regardless of whether the email exists (prevent user enumeration).
-func (s *AuthService) SendPasswordResetCode(ctx context.Context, email string, locale ...string) (*SendVerifyCodeResult, error) {
-	email = normalizePasswordResetEmail(email)
-	result := &SendVerifyCodeResult{
-		Countdown: 60,
-	}
-
-	if !s.IsPasswordResetEnabled(ctx) {
-		return nil, infraerrors.Forbidden("PASSWORD_RESET_DISABLED", "password reset is not enabled")
-	}
-	if s.emailQueueService == nil {
-		return nil, ErrServiceUnavailable
-	}
-
-	normalizedEmail, siteName, shouldProceed := s.preparePasswordResetCode(ctx, email)
-	if shouldProceed {
-		if err := s.emailQueueService.EnqueueVerifyCode(normalizedEmail, siteName, firstEmailLocale(locale)); err != nil {
-			logger.LegacyPrintf("service.auth", "[Auth] Failed to enqueue password reset code for %s: %v", normalizedEmail, err)
-			return result, nil // Silent success to prevent enumeration
-		}
-		logger.LegacyPrintf("service.auth", "[Auth] Password reset code enqueued for: %s", normalizedEmail)
-	}
-
-	return result, nil
-}
-
 // ResetPassword 重置密码
 // Security: Increments TokenVersion to invalidate all existing JWT tokens
 func (s *AuthService) ResetPassword(ctx context.Context, email, token, newPassword string) error {
-	email = normalizePasswordResetEmail(email)
-
 	// Check if password reset is enabled
 	if !s.IsPasswordResetEnabled(ctx) {
 		return infraerrors.Forbidden("PASSWORD_RESET_DISABLED", "password reset is not enabled")
@@ -1427,42 +1362,6 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, token, newPasswo
 		return ErrUserNotActive
 	}
 
-	return s.resetPasswordForUser(ctx, user, newPassword)
-}
-
-// ResetPasswordWithCode resets a password after verifying the email code.
-// Security: Increments TokenVersion to invalidate all existing JWT tokens.
-func (s *AuthService) ResetPasswordWithCode(ctx context.Context, email, verifyCode, newPassword string) error {
-	email = normalizePasswordResetEmail(email)
-	verifyCode = strings.TrimSpace(verifyCode)
-
-	if !s.IsPasswordResetEnabled(ctx) {
-		return infraerrors.Forbidden("PASSWORD_RESET_DISABLED", "password reset is not enabled")
-	}
-	if s.emailService == nil {
-		return ErrServiceUnavailable
-	}
-
-	user, err := s.userRepo.GetByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
-			return ErrInvalidVerifyCode
-		}
-		logger.LegacyPrintf("service.auth", "[Auth] Database error getting user for password reset code: %v", err)
-		return ErrServiceUnavailable
-	}
-	if !user.IsActive() {
-		return ErrInvalidVerifyCode
-	}
-
-	if err := s.emailService.VerifyCode(ctx, email, verifyCode); err != nil {
-		return err
-	}
-
-	return s.resetPasswordForUser(ctx, user, newPassword)
-}
-
-func (s *AuthService) resetPasswordForUser(ctx context.Context, user *User, newPassword string) error {
 	// Hash new password
 	hashedPassword, err := s.HashPassword(newPassword)
 	if err != nil {
@@ -1484,7 +1383,7 @@ func (s *AuthService) resetPasswordForUser(ctx context.Context, user *User, newP
 		// Don't return error - password was already changed successfully
 	}
 
-	logger.LegacyPrintf("service.auth", "[Auth] Password reset successful for user: %s", user.Email)
+	logger.LegacyPrintf("service.auth", "[Auth] Password reset successful for user: %s", email)
 	return nil
 }
 

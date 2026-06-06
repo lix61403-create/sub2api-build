@@ -578,25 +578,6 @@ type ForgotPasswordResponse struct {
 	Message string `json:"message"`
 }
 
-// PasswordResetCodeRequest requests a verification code for password reset.
-type PasswordResetCodeRequest struct {
-	Email          string `json:"email" binding:"required,email"`
-	TurnstileToken string `json:"turnstile_token"`
-}
-
-// PasswordResetCodeResponse is returned after requesting a password reset code.
-type PasswordResetCodeResponse struct {
-	Message   string `json:"message"`
-	Countdown int    `json:"countdown"`
-}
-
-// ResetPasswordWithCodeRequest resets a password with an email verification code.
-type ResetPasswordWithCodeRequest struct {
-	Email       string `json:"email" binding:"required,email"`
-	VerifyCode  string `json:"verify_code" binding:"required"`
-	NewPassword string `json:"new_password" binding:"required,min=6"`
-}
-
 // ForgotPassword 请求密码重置
 // POST /api/v1/auth/forgot-password
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
@@ -631,32 +612,6 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	})
 }
 
-// SendPasswordResetCode requests an email verification code for password reset.
-// POST /api/v1/auth/send-password-reset-code
-func (h *AuthHandler) SendPasswordResetCode(c *gin.Context) {
-	var req PasswordResetCodeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	if err := h.authService.VerifyTurnstile(c.Request.Context(), req.TurnstileToken, ip.GetClientIP(c)); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	result, err := h.authService.SendPasswordResetCode(c.Request.Context(), req.Email, c.GetHeader("Accept-Language"))
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, PasswordResetCodeResponse{
-		Message:   "If your email is registered, you will receive a password reset code shortly.",
-		Countdown: result.Countdown,
-	})
-}
-
 // ResetPasswordRequest 重置密码请求
 type ResetPasswordRequest struct {
 	Email       string `json:"email" binding:"required,email"`
@@ -680,25 +635,6 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 
 	// Reset password
 	if err := h.authService.ResetPassword(c.Request.Context(), req.Email, req.Token, req.NewPassword); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, ResetPasswordResponse{
-		Message: "Your password has been reset successfully. You can now log in with your new password.",
-	})
-}
-
-// ResetPasswordWithCode resets a password using an email verification code.
-// POST /api/v1/auth/reset-password-with-code
-func (h *AuthHandler) ResetPasswordWithCode(c *gin.Context) {
-	var req ResetPasswordWithCodeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	if err := h.authService.ResetPasswordWithCode(c.Request.Context(), req.Email, req.VerifyCode, req.NewPassword); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}

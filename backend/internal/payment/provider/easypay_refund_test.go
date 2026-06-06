@@ -36,50 +36,6 @@ func TestNormalizeEasyPayAPIBase(t *testing.T) {
 	}
 }
 
-func TestEasyPayCreatePaymentParsesProviderAdjustedMoney(t *testing.T) {
-	t.Parallel()
-
-	var gotPath string
-	var gotForm url.Values
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		if err := r.ParseForm(); err != nil {
-			t.Errorf("ParseForm: %v", err)
-		}
-		gotForm = r.PostForm
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":1,"msg":"ok","trade_no":"202606050001","money":"10.03","payurl":"https://pay.example.com/h5","qrcode":"https://pay.example.com/qr"}`))
-	}))
-	defer server.Close()
-
-	provider := newTestEasyPay(t, server.URL+"/mapi.php")
-	resp, err := provider.CreatePayment(context.Background(), payment.CreatePaymentRequest{
-		OrderID:     "sub2_123",
-		Amount:      "10",
-		PaymentType: payment.TypeAlipay,
-		Subject:     "Balance Recharge",
-		ClientIP:    "127.0.0.1",
-	})
-	if err != nil {
-		t.Fatalf("CreatePayment returned error: %v", err)
-	}
-	if gotPath != "/mapi.php" {
-		t.Fatalf("create payment path = %q, want /mapi.php", gotPath)
-	}
-	if got := gotForm.Get("money"); got != "10" {
-		t.Fatalf("form[money] = %q, want 10 (form=%v)", got, gotForm)
-	}
-	if resp.TradeNo != "202606050001" {
-		t.Fatalf("trade_no = %q, want 202606050001", resp.TradeNo)
-	}
-	if resp.PayAmount != 10.03 {
-		t.Fatalf("pay amount = %v, want 10.03", resp.PayAmount)
-	}
-	if resp.QRCode != "https://pay.example.com/qr" {
-		t.Fatalf("qr_code = %q, want provider QR code", resp.QRCode)
-	}
-}
-
 func TestEasyPayRefundNormalizesAPIBaseAndSendsOutTradeNoOnly(t *testing.T) {
 	t.Parallel()
 

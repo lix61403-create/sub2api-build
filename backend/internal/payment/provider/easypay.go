@@ -173,7 +173,6 @@ func (e *EasyPay) createAPIPayment(ctx context.Context, req payment.CreatePaymen
 		Code    int    `json:"code"`
 		Msg     string `json:"msg"`
 		TradeNo string `json:"trade_no"`
-		Money   string `json:"money"`
 		PayURL  string `json:"payurl"`
 		PayURL2 string `json:"payurl2"` // H5 mobile payment URL
 		QRCode  string `json:"qrcode"`
@@ -188,13 +187,7 @@ func (e *EasyPay) createAPIPayment(ctx context.Context, req payment.CreatePaymen
 	if req.IsMobile && resp.PayURL2 != "" {
 		payURL = resp.PayURL2
 	}
-	payAmount, _ := strconv.ParseFloat(strings.TrimSpace(resp.Money), 64)
-	return &payment.CreatePaymentResponse{
-		TradeNo:   resp.TradeNo,
-		PayAmount: payAmount,
-		PayURL:    payURL,
-		QRCode:    resp.QRCode,
-	}, nil
+	return &payment.CreatePaymentResponse{TradeNo: resp.TradeNo, PayURL: payURL, QRCode: resp.QRCode}, nil
 }
 
 // resolveURLs returns (notifyURL, returnURL) preferring request values,
@@ -220,22 +213,59 @@ func (e *EasyPay) QueryOrder(ctx context.Context, tradeNo string) (*payment.Quer
 	if err != nil {
 		return nil, fmt.Errorf("easypay query: %w", err)
 	}
+	type easyPayQueryData struct {
+		TradeStatus *string `json:"trade_status"`
+		Status      *int    `json:"status"`
+		Money       *string `json:"money"`
+		TradeNo     *string `json:"trade_no"`
+	}
 	var resp struct {
-		Code   int    `json:"code"`
-		Msg    string `json:"msg"`
-		Status int    `json:"status"`
-		Money  string `json:"money"`
+		Code        int              `json:"code"`
+		Msg         string           `json:"msg"`
+		TradeStatus *string          `json:"trade_status"`
+		Status      *int             `json:"status"`
+		Money       *string          `json:"money"`
+		TradeNo     *string          `json:"trade_no"`
+		Data        easyPayQueryData `json:"data"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("easypay parse query: %w", err)
 	}
 	status := payment.ProviderStatusPending
-	if resp.Status == easypayStatusPaid {
+	if resp.TradeStatus != nil {
+		if *resp.TradeStatus == tradeStatusSuccess {
+			status = payment.ProviderStatusPaid
+		}
+	} else if resp.Data.TradeStatus != nil {
+		if *resp.Data.TradeStatus == tradeStatusSuccess {
+			status = payment.ProviderStatusPaid
+		}
+	} else if resp.Status != nil {
+		if *resp.Status == easypayStatusPaid {
+			status = payment.ProviderStatusPaid
+		}
+	} else if resp.Data.Status != nil && *resp.Data.Status == easypayStatusPaid {
 		status = payment.ProviderStatusPaid
 	}
-	amount, _ := strconv.ParseFloat(resp.Money, 64)
+
+	money := ""
+	if resp.Money != nil {
+		money = *resp.Money
+	} else if resp.Data.Money != nil {
+		money = *resp.Data.Money
+	}
+	responseTradeNo := tradeNo
+	if resp.TradeNo != nil {
+		if *resp.TradeNo != "" {
+			responseTradeNo = *resp.TradeNo
+		}
+	} else if resp.Data.TradeNo != nil && *resp.Data.TradeNo != "" {
+		responseTradeNo = *resp.Data.TradeNo
+	}
+
+	amount, _ := strconv.ParseFloat(money, 64)
 	return &payment.QueryOrderResponse{
-		TradeNo:  tradeNo,
+		TradeNo:  responseTradeNo,
 		Status:   status,
 		Amount:   amount,
 		Metadata: e.MerchantIdentityMetadata(),

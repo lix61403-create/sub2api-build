@@ -1,4 +1,4 @@
-﻿package server
+package server
 
 import (
 	"context"
@@ -115,4 +115,3 @@ func registerRoutes(
 
 	handler.RegisterPageRoutes(v1, cfg.Pricing.DataDir, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth), settingService)
 }
-

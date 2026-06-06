@@ -91,37 +91,6 @@ func TestBuildCreateOrderResponseCopiesJSAPIPayload(t *testing.T) {
 	}
 }
 
-func TestBuildCreateOrderResponseUsesStoredProviderAdjustedPayAmount(t *testing.T) {
-	t.Parallel()
-
-	resp := buildCreateOrderResponse(
-		&dbent.PaymentOrder{
-			ID:         91,
-			Amount:     50,
-			PayAmount:  10.03,
-			FeeRate:    0,
-			ExpiresAt:  time.Date(2026, 6, 5, 21, 30, 0, 0, time.UTC),
-			OutTradeNo: "sub2_adjusted",
-		},
-		CreateOrderRequest{PaymentType: payment.TypeAlipay},
-		10,
-		&payment.InstanceSelection{PaymentMode: "qrcode"},
-		&payment.CreatePaymentResponse{
-			TradeNo:   "202606050001",
-			PayAmount: 10.03,
-			QRCode:    "https://pay.example.com/qr",
-		},
-		payment.CreatePaymentResultOrderCreated,
-	)
-
-	if resp.PayAmount != 10.03 {
-		t.Fatalf("pay_amount = %v, want provider-adjusted 10.03", resp.PayAmount)
-	}
-	if resp.Amount != 50 {
-		t.Fatalf("credited amount = %v, want 50", resp.Amount)
-	}
-}
-
 func TestValidateSelectedCreateOrderAmountCurrencyRejectsFractionalZeroDecimal(t *testing.T) {
 	t.Parallel()
 
